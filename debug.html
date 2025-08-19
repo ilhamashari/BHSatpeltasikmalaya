@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Jembatan Baru</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .debug-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .debug-panel h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .debug-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .debug-btn:hover {
+            background: #0056b3;
+        }
+        .debug-btn.danger {
+            background: #dc3545;
+        }
+        .debug-btn.danger:hover {
+            background: #c82333;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .data-display {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Debug Panel - Website Jembatan Baru</h1>
+        
+        <div class="debug-panel">
+            <h3>Debug Controls</h3>
+            <button class="debug-btn" onclick="debugDataSync()">🔍 Debug Data Sync</button>
+            <button class="debug-btn" onclick="testFocusMarker()">🎯 Test Focus Marker</button>
+            <button class="debug-btn" onclick="clearConsole()">🗑️ Clear Console</button>
+            <button class="debug-btn danger" onclick="resetData()">🔄 Reset Data</button>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="debug-panel">
+            <h3>Data Status</h3>
+            <div id="dataStatus">Loading...</div>
+        </div>
+        
+        <div class="debug-panel">
+            <h3>Console Output</h3>
+            <div class="data-display" id="consoleOutput">
+                Console output will appear here...
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Override console.log untuk menampilkan di halaman
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        
+        function addToConsole(message, type = 'log') {
+            const consoleOutput = document.getElementById('consoleOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#dc3545' : type === 'warn' ? '#ffc107' : '#28a745';
+            
+            consoleOutput.innerHTML += `<div style="color: ${color}; margin: 2px 0;">
+                [${timestamp}] ${message}
+            </div>`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToConsole(args.join(' '), 'log');
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addToConsole(args.join(' '), 'warn');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToConsole(args.join(' '), 'error');
+        };
+        
+        // Test functions
+        function testFocusMarker() {
+            if (jembatanData && jembatanData.length > 0) {
+                const randomIndex = Math.floor(Math.random() * jembatanData.length);
+                const jembatan = jembatanData[randomIndex];
+                console.log(`Testing focus marker untuk ${jembatan.nomorBH}...`);
+                focusMarkerByID(jembatan.id);
+            } else {
+                console.warn('Tidak ada data jembatan untuk testing');
+            }
+        }
+        
+        function clearConsole() {
+            document.getElementById('consoleOutput').innerHTML = 'Console cleared...';
+        }
+        
+        function resetData() {
+            if (confirm('Yakin ingin mereset semua data? Ini akan menghapus semua data jembatan.')) {
+                localStorage.removeItem('jembatanData');
+                jembatanData = [];
+                markers.forEach(marker => map.removeLayer(marker));
+                markers = [];
+                updateDataStatus();
+                console.log('Data berhasil direset');
+            }
+        }
+        
+        function updateDataStatus() {
+            const statusDiv = document.getElementById('dataStatus');
+            statusDiv.innerHTML = `
+                <strong>Total Jembatan:</strong> ${jembatanData.length}<br>
+                <strong>Total Markers:</strong> ${markers.length}<br>
+                <strong>Filter Aktif:</strong> ${currentFilter || 'none'}<br>
+                <strong>Data Source:</strong> ${useFirebase ? 'Firebase' : 'LocalStorage'}
+            `;
+        }
+        
+        // Update status setiap 2 detik
+        setInterval(updateDataStatus, 2000);
+        
+        // Update status saat halaman dimuat
+        window.addEventListener('load', function() {
+            setTimeout(updateDataStatus, 1000);
+        });
+    </script>
+</body>
+</html>

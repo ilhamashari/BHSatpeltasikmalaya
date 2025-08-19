@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - BH Jembatan Satpel Tasikmalaya</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-storage-compat.js"></script>
+    
+    <!-- Firebase Config -->
+    <script src="firebase-config.js"></script>
+    
+    <!-- SheetJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(rgba(102, 126, 234, 0.7), rgba(118, 75, 162, 0.7)), url('background-image.jpg') no-repeat center center fixed;
+            background-size: cover;
+            min-height: 100vh;
+        }
+        
+        .admin-container {
+            min-height: 100vh;
+        }
+        
+        .admin-header {
+            background: linear-gradient(rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9)), url('background-image.jpg') no-repeat center center;
+            background-size: cover;
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            backdrop-filter: blur(5px);
+        }
+        
+        .admin-header h1 {
+            font-size: 1.5rem;
+        }
+        
+        .admin-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .main-content {
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header-section {
+            text-align: center;
+            color: white;
+            margin-bottom: 2rem;
+        }
+        
+        .header-section h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header-section p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255,255,255,0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            margin-top: 1rem;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00ff00;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .map-section {
+            background: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .map-section h2 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        #map {
+            height: 400px;
+            border-radius: 10px;
+            border: 2px solid #e1e5e9;
+        }
+        
+        .stats-section {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        
+        .stat-card:hover .stat-number {
+            color: white;
+        }
+        
+        .stat-card:hover .stat-label {
+            color: rgba(255,255,255,0.9);
+        }
+        
+        .stat-card.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .stat-card.active .stat-number {
+            color: white;
+        }
+        
+        .stat-card.active .stat-label {
+            color: rgba(255,255,255,0.9);
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        /* Responsive design untuk stats */
+        @media (max-width: 1200px) {
+            .stats-section {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 8px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .stats-section {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+            }
+            
+            .stat-card {
+                padding: 12px;
+            }
+            
+            .stat-number {
+                font-size: 1.5rem;
+            }
+            
+            .stat-label {
+                font-size: 0.75rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .stats-section {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 6px;
+            }
+            
+            .stat-card {
+                padding: 10px;
+            }
+            
+            .stat-number {
+                font-size: 1.2rem;
+            }
+            
+            .stat-label {
+                font-size: 0.7rem;
+            }
+        }
+        
+        .admin-section {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .admin-section h2 {
+            color: #333;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #333;
+        }
+        
+                 .form-group input, .form-group select {
+             width: 100%;
+             padding: 10px;
+             border: 1px solid #ddd;
+             border-radius: 5px;
+             font-size: 14px;
+         }
+         
+         /* Memastikan input number bisa menerima desimal */
+         .form-group input[type="number"] {
+             -moz-appearance: textfield;
+         }
+         
+         .form-group input[type="number"]::-webkit-outer-spin-button,
+         .form-group input[type="number"]::-webkit-inner-spin-button {
+             -webkit-appearance: none;
+             margin: 0;
+         }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0;
+            min-width: 120px;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #00b894;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+                 .btn-warning {
+             background: #f39c12;
+             color: white;
+         }
+         
+                 /* Style untuk link Google Maps agar konsisten dengan tombol */
+        .jembatan-actions a.btn {
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .jembatan-list {
+            margin-top: 2rem;
+        }
+        
+        .jembatan-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .jembatan-item h4 {
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+        
+        .jembatan-item p {
+            margin: 0.25rem 0;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .jembatan-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+                 .hidden {
+             display: none;
+         }
+         
+         /* File Upload Styles */
+         .file-upload-container {
+             display: flex;
+             gap: 1rem;
+             align-items: center;
+             margin-bottom: 1rem;
+         }
+         
+         .file-upload {
+             position: relative;
+             width: 300px;
+             height: 120px;
+             border: 2px dashed #667eea;
+             border-radius: 10px;
+             display: flex;
+             flex-direction: column;
+             align-items: center;
+             justify-content: center;
+             cursor: pointer;
+             transition: all 0.3s ease;
+             background: #f8f9fa;
+         }
+         
+         .file-upload:hover {
+             border-color: #5a6fd8;
+             background: #f0f2ff;
+         }
+         
+         .file-upload.dragover {
+             border-color: #00b894;
+             background: #e8f5e8;
+         }
+         
+         .upload-text {
+             font-weight: bold;
+             color: #667eea;
+             margin-bottom: 5px;
+         }
+         
+         .upload-hint {
+             font-size: 12px;
+             color: #666;
+         }
+         
+         .file-upload input[type="file"] {
+             position: absolute;
+             width: 100%;
+             height: 100%;
+             opacity: 0;
+             cursor: pointer;
+         }
+         
+         .loading {
+             display: flex;
+             flex-direction: column;
+             align-items: center;
+             gap: 1rem;
+             padding: 2rem;
+             background: #f8f9fa;
+             border-radius: 10px;
+             margin: 1rem 0;
+         }
+         
+         .spinner {
+             width: 40px;
+             height: 40px;
+             border: 4px solid #f3f3f3;
+             border-top: 4px solid #667eea;
+             border-radius: 50%;
+             animation: spin 1s linear infinite;
+         }
+         
+         @keyframes spin {
+             0% { transform: rotate(0deg); }
+             100% { transform: rotate(360deg); }
+         }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>🔐 Admin Dashboard - BH Jembatan</h1>
+            <div class="admin-info">
+                <span>Welcome, <strong id="adminName">Admin</strong></span>
+                <button onclick="logoutAdmin()" class="logout-btn">Logout</button>
+            </div>
+        </header>
+        
+        <div class="main-content">
+            <!-- Header Section -->
+            <div class="header-section">
+                <h1>BH Jembatan Satpel Tasikmalaya</h1>
+                <p>Balai Teknik Perkeretaapian Kelas 1 Bandung</p>
+                <div class="connection-status">
+                    <div class="status-indicator"></div>
+                    <span>Terhubung ke database (Real-time)</span>
+                </div>
+            </div>
+            
+            <!-- Map Section -->
+            <div class="map-section">
+                <h2>🗺️ Peta Lokasi Jembatan</h2>
+                <div id="map"></div>
+            </div>
+            
+            <!-- Stats Section -->
+            <div class="stats-section">
+                <div class="stat-card" onclick="filterJembatanAdmin('all', event)">
+                    <div class="stat-number" id="totalJembatan">0</div>
+                    <div class="stat-label">Total Jembatan</div>
+                </div>
+                <div class="stat-card" onclick="filterJembatanAdmin('K1', event)">
+                    <div class="stat-number" id="jembatanK1">0</div>
+                    <div class="stat-label">Kelas K1</div>
+                </div>
+                <div class="stat-card" onclick="filterJembatanAdmin('K2', event)">
+                    <div class="stat-number" id="jembatanK2">0</div>
+                    <div class="stat-label">Kelas K2</div>
+                </div>
+                <div class="stat-card" onclick="filterJembatanAdmin('K3', event)">
+                    <div class="stat-number" id="jembatanK3">0</div>
+                    <div class="stat-label">Kelas K3</div>
+                </div>
+                <div class="stat-card" onclick="filterJembatanAdmin('100tahun', event)">
+                    <div class="stat-number" id="jembatan100Tahun">0</div>
+                    <div class="stat-label">Umur 100 Tahun Lebih</div>
+                </div>
+                <div class="stat-card" onclick="filterJembatanAdmin('panjang50', event)">
+                    <div class="stat-number" id="jembatanPanjang50M">0</div>
+                    <div class="stat-label">Panjang > 50 M</div>
+                </div>
+                <div class="stat-card" onclick="filterJembatanAdmin('panjang10', event)">
+                    <div class="stat-number" id="jembatanPanjang10M">0</div>
+                    <div class="stat-label">Panjang < 10 M</div>
+                </div>
+            </div>
+            
+            <!-- Admin Section -->
+            <div class="admin-section">
+                <h2>📝 Kelola Data Jembatan</h2>
+                <div id="adminMessage"></div>
+                
+                                 <!-- Add Jembatan Form -->
+                 <form id="addJembatanForm">
+                     <h3>➕ Tambah Jembatan Baru</h3>
+                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                         <div class="form-group">
+                             <label for="nomorBH">Nomor BH</label>
+                             <input type="text" id="nomorBH" required>
+                         </div>
+                         <div class="form-group">
+                             <label for="kmhm">Km HM</label>
+                             <input type="text" id="kmhm" required>
+                         </div>
+                         <div class="form-group">
+                             <label for="kelas">Kelas Jembatan</label>
+                             <select id="kelas" required>
+                                 <option value="">Pilih Kelas</option>
+                                 <option value="K1">K1</option>
+                                 <option value="K2">K2</option>
+                                 <option value="K3">K3</option>
+                             </select>
+                         </div>
+                                                  <div class="form-group">
+                              <label for="panjang">Panjang Bentang (m)</label>
+                              <input type="number" id="panjang" step="0.01" min="0" required>
+                          </div>
+                         <div class="form-group">
+                             <label for="lat">Latitude</label>
+                             <input type="number" id="lat" step="0.000001" required>
+                         </div>
+                         <div class="form-group">
+                             <label for="lng">Longitude</label>
+                             <input type="number" id="lng" step="0.000001" required>
+                         </div>
+                                                   <div class="form-group">
+                              <label for="tahunPembuatan">Tahun Pembuatan</label>
+                              <input type="number" id="tahunPembuatan" required>
+                          </div>
+                     </div>
+                     <div class="form-group">
+                         <label for="linkFoto">Link Foto (opsional)</label>
+                         <input type="url" id="linkFoto" placeholder="https://example.com/foto.jpg">
+                     </div>
+                                          <button type="submit" class="btn btn-primary">Tambah Jembatan</button>
+                      <button type="reset" class="btn btn-warning" onclick="resetForm()">Reset</button>
+                 </form>
+                 
+                 <!-- Upload Excel Section -->
+                 <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #eee;">
+                     <h3>📤 Upload Data Excel</h3>
+                     <div class="file-upload-container">
+                         <div class="file-upload" id="fileUpload">
+                             <div class="upload-text">Klik atau drag file Excel</div>
+                             <div class="upload-hint">Format: .xlsx, .xls, .csv</div>
+                             <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
+                         </div>
+                         <button id="downloadTemplate" class="btn btn-success">⬇️ Download Template</button>
+                     </div>
+                     
+                     <div class="loading" id="loading" style="display: none;">
+                         <div class="spinner"></div>
+                         <p>Memproses file Excel...</p>
+                     </div>
+                 </div>
+                
+                <!-- Jembatan List -->
+                <div class="jembatan-list">
+                    <h3>📋 Daftar Jembatan</h3>
+                    <div id="jembatanList">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    
+    <script>
+        // Check admin authentication
+        firebase.auth().onAuthStateChanged(function(user) {
+            if (user) {
+                const adminEmails = ['admin@example.com', 'ilhamashari0070@gmail.com', 'ilhamashari941@gmail.com', 'satuanpelayanan@tasikmalaya.com'];
+                if (adminEmails.includes(user.email)) {
+                    document.getElementById('adminName').textContent = user.email;
+                    initializeMap();
+                    loadData();
+                } else {
+                    alert('Akses ditolak. Anda bukan admin.');
+                    logoutAdmin();
+                }
+            } else {
+                window.location.href = 'admin-login.html';
+            }
+        });
+
+        // Logout function
+        function logoutAdmin() {
+            firebase.auth().signOut().then(function() {
+                window.location.href = 'admin-login.html';
+            }).catch(function(error) {
+                console.error('Error logging out:', error);
+            });
+        }
+
+        // Map variables
+        let map;
+        let markers = [];
+        let bridgeIcon;
+        let jembatanData = []; // Tambahkan variabel untuk menyimpan data jembatan
+        let currentFilterAdmin = 'all';
+        let filteredJembatanDataAdmin = [];
+
+        // Initialize map
+        function initializeMap() {
+            // Create custom bridge icon (sama dengan index.html)
+            bridgeIcon = L.icon({
+                iconUrl: 'bridge-icon.png', // Pastikan file ini ada di folder yang sama
+                iconSize: [48, 48],
+                iconAnchor: [24, 48],
+                popupAnchor: [0, -48]
+            });
+
+            // Initialize map centered on Tasikmalaya
+            map = L.map('map').setView([-7.3695, 108.5706], 10);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        // Load data from Firebase
+        async function loadData() {
+            try {
+                jembatanData = await FirebaseService.getAllJembatan();
+                
+                // Update stats
+                document.getElementById('totalJembatan').textContent = jembatanData.length;
+                
+                const k1Count = jembatanData.filter(j => j.kelas === 'K1').length;
+                const k2Count = jembatanData.filter(j => j.kelas === 'K2').length;
+                const k3Count = jembatanData.filter(j => j.kelas === 'K3').length;
+                
+                document.getElementById('jembatanK1').textContent = k1Count;
+                document.getElementById('jembatanK2').textContent = k2Count;
+                document.getElementById('jembatanK3').textContent = k3Count;
+                
+                // Hitung jembatan yang berumur 100+ tahun
+                const currentYear = new Date().getFullYear();
+                const jembatan100Tahun = jembatanData.filter(j => {
+                    if (j.tahunPembuatan && !isNaN(j.tahunPembuatan)) {
+                        return (currentYear - j.tahunPembuatan) >= 100;
+                    }
+                    return false;
+                }).length;
+                
+                // Hitung jembatan dengan panjang bentang > 50 M
+                const jembatanPanjang50M = jembatanData.filter(j => {
+                    if (j.panjang && !isNaN(j.panjang)) {
+                        return parseFloat(j.panjang) > 50;
+                    }
+                    return false;
+                }).length;
+                
+                // Hitung jembatan dengan panjang bentang < 10 M
+                const jembatanPanjang10M = jembatanData.filter(j => {
+                    if (j.panjang && !isNaN(j.panjang)) {
+                        return parseFloat(j.panjang) < 10;
+                    }
+                    return false;
+                }).length;
+                
+                document.getElementById('jembatan100Tahun').textContent = jembatan100Tahun;
+                document.getElementById('jembatanPanjang50M').textContent = jembatanPanjang50M;
+                document.getElementById('jembatanPanjang10M').textContent = jembatanPanjang10M;
+                
+                // Update map markers
+                updateMapMarkers(jembatanData);
+                
+                // Update jembatan list
+                updateJembatanList(jembatanData);
+                
+                // Reset filter dan tampilkan semua data
+                currentFilterAdmin = 'all';
+                filteredJembatanDataAdmin = jembatanData;
+                
+                // Reset stat cards
+                document.querySelectorAll('.stat-card').forEach(card => {
+                    card.classList.remove('active');
+                });
+                
+                // Aktifkan "Total Jembatan" card
+                const totalCard = document.querySelector('.stat-card[onclick*="all"]');
+                if (totalCard) {
+                    totalCard.classList.add('active');
+                }
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showMessage('adminMessage', 'Error loading data: ' + error.message, 'error');
+            }
+        }
+
+        // Update map markers
+        function updateMapMarkers(jembatanData) {
+            // Clear existing markers
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            // Add new markers
+            jembatanData.forEach((jembatan, index) => {
+                let fotoLinkHtml = '';
+                if (jembatan.foto) {
+                    fotoLinkHtml = `<a href="${jembatan.foto}" target="_blank" style="font-weight:bold;display:block;margin-bottom:6px;">📷 Foto Jembatan</a>`;
+                }
+                
+                const marker = L.marker([jembatan.lat, jembatan.lng], { icon: bridgeIcon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <div style="min-width: 220px;">
+                            ${fotoLinkHtml}
+                            <h3 style="margin: 0 0 10px 0; color: #333;">${jembatan.nomorBH}</h3>
+                            <p style="margin: 5px 0; color: #666;">
+                                <strong>Km HM:</strong> ${jembatan.kmhm}<br>
+                                <strong>Kelas:</strong> ${jembatan.kelas}<br>
+                                <strong>Panjang Bentang:</strong> ${jembatan.panjang} m<br>
+                                <strong>Tahun Pembuatan:</strong> ${jembatan.tahunPembuatan || 'Tidak ada data'}<br>
+                                <strong>Koordinat:</strong><br>
+                                Lat: ${jembatan.lat.toFixed(6)}<br>
+                                Lng: ${jembatan.lng.toFixed(6)}
+                            </p>
+                        </div>
+                    `);
+                markers.push(marker);
+            });
+        }
+
+                // Update jembatan list
+        function updateJembatanList(dataToShow = jembatanData) {
+            const listContainer = document.getElementById('jembatanList');
+            
+            if (dataToShow.length === 0) {
+                listContainer.innerHTML = '<p>Tidak ada jembatan yang sesuai dengan filter.</p>';
+                return;
+            }
+            
+            listContainer.innerHTML = dataToShow.map((jembatan, index) => `
+                <div class="jembatan-item">
+                    <h4>${jembatan.nomorBH}</h4>
+                    <p>Km HM: ${jembatan.kmhm} | Kelas: ${jembatan.kelas}</p>
+                    <p>Panjang: ${jembatan.panjang}m | Tahun: ${jembatan.tahunPembuatan || 'Tidak ada data'}</p>
+                    <p>Koordinat: ${jembatan.lat}, ${jembatan.lng}</p>
+                    ${jembatan.foto ? '<p>📷 <a href="' + jembatan.foto + '" target="_blank">Lihat Foto</a></p>' : ''}
+                                         <div class="jembatan-actions">
+                         <a href="https://www.google.com/maps/search/?api=1&query=${jembatan.lat},${jembatan.lng}" target="_blank" class="btn btn-success">Google Maps</a>
+                         <button onclick="focusOnMap(${jembatan.lat}, ${jembatan.lng})" class="btn btn-primary">Fokus Peta</button>
+                         <button onclick="editJembatan('${jembatan.id}')" class="btn btn-warning">Edit</button>
+                         <button onclick="deleteJembatan('${jembatan.id}')" class="btn btn-danger">Hapus</button>
+                     </div>
+                 </div>
+             `).join('');
+         }
+
+        // Focus on map location
+        function focusOnMap(lat, lng) {
+            map.setView([lat, lng], 15);
+        }
+
+                 // Add/Edit jembatan form handler
+         document.getElementById('addJembatanForm').addEventListener('submit', async function(e) {
+             e.preventDefault();
+             
+             // Validasi input panjang bentang
+             const panjangInput = document.getElementById('panjang').value;
+             const panjang = parseFloat(panjangInput);
+             
+             if (isNaN(panjang) || panjang <= 0) {
+                 showMessage('adminMessage', 'Panjang Bentang harus berupa angka positif!', 'error');
+                 return;
+             }
+             
+                           // Validasi input tahun pembuatan
+              const tahunPembuatanInput = document.getElementById('tahunPembuatan').value;
+              const tahunPembuatan = parseInt(tahunPembuatanInput);
+              
+              if (isNaN(tahunPembuatan)) {
+                  showMessage('adminMessage', 'Tahun Pembuatan harus berupa angka!', 'error');
+                  return;
+              }
+             
+             const formData = {
+                 nomorBH: document.getElementById('nomorBH').value,
+                 kmhm: document.getElementById('kmhm').value,
+                 kelas: document.getElementById('kelas').value,
+                 panjang: panjang,
+                 lat: parseFloat(document.getElementById('lat').value),
+                 lng: parseFloat(document.getElementById('lng').value),
+                 tahunPembuatan: parseInt(document.getElementById('tahunPembuatan').value),
+                 foto: document.getElementById('linkFoto').value || ''
+             };
+            
+            // Cek apakah sedang edit atau tambah baru
+            const editId = this.getAttribute('data-edit-id');
+            
+            try {
+                if (editId) {
+                    // Update jembatan yang ada
+                    await FirebaseService.updateJembatan(editId, formData);
+                    showMessage('adminMessage', 'Jembatan berhasil diupdate!', 'success');
+                } else {
+                    // Tambah jembatan baru
+                    await FirebaseService.addJembatan(formData);
+                    showMessage('adminMessage', 'Jembatan berhasil ditambahkan!', 'success');
+                }
+                
+                // Reset form dan tombol
+                this.reset();
+                this.removeAttribute('data-edit-id');
+                const submitBtn = this.querySelector('button[type="submit"]');
+                submitBtn.textContent = 'Tambah Jembatan';
+                submitBtn.className = 'btn btn-primary';
+                
+                loadData();
+            } catch (error) {
+                showMessage('adminMessage', 'Error: ' + error.message, 'error');
+            }
+        });
+
+        // Edit jembatan function
+        function editJembatan(id) {
+            // Cari data jembatan berdasarkan ID
+            const jembatan = jembatanData.find(j => j.id === id);
+            if (!jembatan) {
+                showMessage('adminMessage', 'Data jembatan tidak ditemukan!', 'error');
+                return;
+            }
+            
+            // Isi form dengan data yang ada
+            document.getElementById('nomorBH').value = jembatan.nomorBH;
+            document.getElementById('kmhm').value = jembatan.kmhm;
+            document.getElementById('kelas').value = jembatan.kelas;
+            document.getElementById('panjang').value = jembatan.panjang;
+            document.getElementById('lat').value = jembatan.lat;
+            document.getElementById('lng').value = jembatan.lng;
+            document.getElementById('tahunPembuatan').value = jembatan.tahunPembuatan || '';
+            document.getElementById('linkFoto').value = jembatan.foto || '';
+            
+            // Ubah tombol submit menjadi update
+            const submitBtn = document.querySelector('#addJembatanForm button[type="submit"]');
+            submitBtn.textContent = 'Update Jembatan';
+            submitBtn.className = 'btn btn-warning';
+            
+            // Tambahkan data ID untuk update
+            document.getElementById('addJembatanForm').setAttribute('data-edit-id', id);
+            
+            // Scroll ke form
+            document.getElementById('addJembatanForm').scrollIntoView({ behavior: 'smooth' });
+            
+            showMessage('adminMessage', 'Form diisi dengan data jembatan. Silakan edit dan klik Update Jembatan.', 'success');
+        }
+
+        // Delete jembatan function
+        async function deleteJembatan(id) {
+            if (confirm('Yakin ingin menghapus jembatan ini?')) {
+                try {
+                    await FirebaseService.deleteJembatan(id);
+                    showMessage('adminMessage', 'Jembatan berhasil dihapus!', 'success');
+                    loadData();
+                } catch (error) {
+                    showMessage('adminMessage', 'Error: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // Reset form function
+        function resetForm() {
+            const form = document.getElementById('addJembatanForm');
+            form.reset();
+            form.removeAttribute('data-edit-id');
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.textContent = 'Tambah Jembatan';
+            submitBtn.className = 'btn btn-primary';
+            showMessage('adminMessage', 'Form telah direset!', 'success');
+        }
+        
+        // Function untuk filter jembatan di admin
+        function filterJembatanAdmin(filterType, event) {
+            currentFilterAdmin = filterType;
+            
+            // Reset semua stat cards
+            document.querySelectorAll('.stat-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            
+            // Aktifkan stat card yang diklik
+            const clickedCard = event.currentTarget;
+            clickedCard.classList.add('active');
+            
+            // Filter data berdasarkan tipe
+            switch(filterType) {
+                case 'all':
+                    filteredJembatanDataAdmin = jembatanData;
+                    break;
+                case 'K1':
+                    filteredJembatanDataAdmin = jembatanData.filter(j => j.kelas === 'K1');
+                    break;
+                case 'K2':
+                    filteredJembatanDataAdmin = jembatanData.filter(j => j.kelas === 'K2');
+                    break;
+                case 'K3':
+                    filteredJembatanDataAdmin = jembatanData.filter(j => j.kelas === 'K3');
+                    break;
+                case '100tahun':
+                    const currentYear = new Date().getFullYear();
+                    filteredJembatanDataAdmin = jembatanData.filter(j => {
+                        if (j.tahunPembuatan && !isNaN(j.tahunPembuatan)) {
+                            return (currentYear - j.tahunPembuatan) >= 100;
+                        }
+                        return false;
+                    });
+                    break;
+                case 'panjang50':
+                    filteredJembatanDataAdmin = jembatanData.filter(j => {
+                        if (j.panjang && !isNaN(j.panjang)) {
+                            return parseFloat(j.panjang) > 50;
+                        }
+                        return false;
+                    });
+                    break;
+                case 'panjang10':
+                    filteredJembatanDataAdmin = jembatanData.filter(j => {
+                        if (j.panjang && !isNaN(j.panjang)) {
+                            return parseFloat(j.panjang) < 10;
+                        }
+                        return false;
+                    });
+                    break;
+                default:
+                    filteredJembatanDataAdmin = jembatanData;
+            }
+            
+            // Update map markers dengan data yang difilter
+            updateMapMarkers(filteredJembatanDataAdmin);
+            
+            // Update jembatan list dengan data yang difilter
+            updateJembatanList(filteredJembatanDataAdmin);
+            
+            // Update judul list
+            updateListTitleAdmin(filterType);
+        }
+        
+        // Function untuk update judul list berdasarkan filter
+        function updateListTitleAdmin(filterType) {
+            const listTitle = document.querySelector('.jembatan-list h3');
+            let title = '📋 Daftar Jembatan';
+            
+            switch(filterType) {
+                case 'K1':
+                    title = '📋 Daftar Jembatan Kelas K1';
+                    break;
+                case 'K2':
+                    title = '📋 Daftar Jembatan Kelas K2';
+                    break;
+                case 'K3':
+                    title = '📋 Daftar Jembatan Kelas K3';
+                    break;
+                case '100tahun':
+                    title = '📋 Daftar Jembatan Umur 100+ Tahun';
+                    break;
+                case 'panjang50':
+                    title = '📋 Daftar Jembatan Panjang > 50 M';
+                    break;
+                case 'panjang10':
+                    title = '📋 Daftar Jembatan Panjang < 10 M';
+                    break;
+                default:
+                    title = '📋 Daftar Jembatan';
+            }
+            
+            listTitle.textContent = title;
+        }
+
+                 // Show message function
+         function showMessage(elementId, message, type) {
+             const element = document.getElementById(elementId);
+             element.innerHTML = `<div class="message ${type}">${message}</div>`;
+             setTimeout(() => {
+                 element.innerHTML = '';
+             }, 3000);
+         }
+         
+                   // Event listener untuk input panjang bentang
+          document.addEventListener('DOMContentLoaded', function() {
+              const panjangInput = document.getElementById('panjang');
+              if (panjangInput) {
+                  panjangInput.addEventListener('input', function(e) {
+                      // Izinkan angka, titik desimal, dan backspace
+                      const value = e.target.value;
+                      const regex = /^\d*\.?\d*$/;
+                      
+                      if (!regex.test(value) && value !== '') {
+                          e.target.value = value.replace(/[^\d.]/g, '');
+                      }
+                      
+                      // Pastikan hanya ada satu titik desimal
+                      const parts = value.split('.');
+                      if (parts.length > 2) {
+                          e.target.value = parts[0] + '.' + parts.slice(1).join('');
+                      }
+                  });
+              }
+              
+              // File upload functionality
+              const fileInput = document.getElementById('fileInput');
+              const fileUpload = document.getElementById('fileUpload');
+              const loading = document.getElementById('loading');
+              
+              if (fileInput) {
+                  // File input change event
+                  fileInput.addEventListener('change', function(e) {
+                      const file = e.target.files[0];
+                      if (file) {
+                          processExcelFile(file);
+                      }
+                  });
+                  
+                  // Drag and drop functionality
+                  fileUpload.addEventListener('dragover', function(e) {
+                      e.preventDefault();
+                      fileUpload.classList.add('dragover');
+                  });
+                  
+                  fileUpload.addEventListener('dragleave', function(e) {
+                      e.preventDefault();
+                      fileUpload.classList.remove('dragover');
+                  });
+                  
+                  fileUpload.addEventListener('drop', function(e) {
+                      e.preventDefault();
+                      fileUpload.classList.remove('dragover');
+                      const file = e.dataTransfer.files[0];
+                      if (file) {
+                          fileInput.files = e.dataTransfer.files;
+                          processExcelFile(file);
+                      }
+                  });
+              }
+              
+              // Download template functionality
+              const downloadTemplate = document.getElementById('downloadTemplate');
+              if (downloadTemplate) {
+                  downloadTemplate.addEventListener('click', function() {
+                      downloadExcelTemplate();
+                  });
+              }
+          });
+          
+          // Process Excel file
+          async function processExcelFile(file) {
+              const loading = document.getElementById('loading');
+              const fileUpload = document.getElementById('fileUpload');
+              
+              try {
+                  // Show loading
+                  loading.style.display = 'flex';
+                  fileUpload.style.opacity = '0.5';
+                  
+                  // Read file
+                  const data = await readExcelFile(file);
+                  
+                  // Validate and process data
+                  const processedData = validateAndProcessData(data);
+                  
+                  if (processedData.length === 0) {
+                      showMessage('adminMessage', 'Tidak ada data valid yang ditemukan dalam file Excel.', 'error');
+                      return;
+                  }
+                  
+                  // Upload to Firebase
+                  await uploadToFirebase(processedData);
+                  
+                  showMessage('adminMessage', `Berhasil mengupload ${processedData.length} data jembatan!`, 'success');
+                  
+                  // Reload data
+                  loadData();
+                  
+              } catch (error) {
+                  console.error('Error processing file:', error);
+                  showMessage('adminMessage', 'Error memproses file: ' + error.message, 'error');
+              } finally {
+                  // Hide loading
+                  loading.style.display = 'none';
+                  fileUpload.style.opacity = '1';
+                  
+                  // Reset file input
+                  document.getElementById('fileInput').value = '';
+              }
+          }
+          
+          // Read Excel file
+          function readExcelFile(file) {
+              return new Promise((resolve, reject) => {
+                  const reader = new FileReader();
+                  
+                  reader.onload = function(e) {
+                      try {
+                          const data = new Uint8Array(e.target.result);
+                          const workbook = XLSX.read(data, { type: 'array' });
+                          const sheetName = workbook.SheetNames[0];
+                          const worksheet = workbook.Sheets[sheetName];
+                          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                          resolve(jsonData);
+                      } catch (error) {
+                          reject(new Error('Error membaca file Excel: ' + error.message));
+                      }
+                  };
+                  
+                  reader.onerror = function() {
+                      reject(new Error('Error membaca file'));
+                  };
+                  
+                  reader.readAsArrayBuffer(file);
+              });
+          }
+          
+          // Validate and process data
+          function validateAndProcessData(data) {
+              const processed = [];
+              
+              data.forEach((row, index) => {
+                  // Ambil data dari format Excel
+                  const nomorBH = row['Nomor BH'] || `BH-${index + 1}`;
+                  const kmhm = row['Km HM'] || '';
+                  const kelas = row['Kelas Jembatan'] || '';
+                  const panjang = row['Panjang Bentang'] || '';
+                  const tahunPembuatan = parseInt(row['Tahun Pembuatan'] || row['Tahun'] || '');
+                  const lat = parseFloat(row['Latitude'] || row['Lat'] || row['latitude']);
+                  const lng = parseFloat(row['Longtitude'] || row['Longitude'] || row['Lng'] || row['Long'] || row['longtitude']);
+
+                                     // Validasi tahun pembuatan
+                   const isValidTahun = !isNaN(tahunPembuatan);
+                  
+                  if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                      processed.push({
+                          nomorBH,
+                          kmhm,
+                          kelas,
+                          panjang,
+                          tahunPembuatan: isValidTahun ? tahunPembuatan : null,
+                          lat,
+                          lng
+                      });
+                  }
+              });
+
+              return processed;
+          }
+          
+          // Upload to Firebase
+          async function uploadToFirebase(dataArray) {
+              try {
+                  showMessage('adminMessage', '🔄 Mengupload data ke Firebase...', 'success');
+                  
+                  for (const data of dataArray) {
+                      // Check if jembatan already exists
+                      const existingData = jembatanData.find(item => item.nomorBH === data.nomorBH);
+                      if (!existingData) {
+                          await FirebaseService.addJembatan(data);
+                      }
+                  }
+                  
+                  showMessage('adminMessage', '✅ Data berhasil diupload ke Firebase!', 'success');
+              } catch (error) {
+                  console.error('Error uploading to Firebase:', error);
+                  showMessage('adminMessage', '❌ Error uploading ke Firebase: ' + error.message, 'error');
+                  throw error;
+              }
+          }
+          
+          // Download Excel template
+          function downloadExcelTemplate() {
+              const wb = XLSX.utils.book_new();
+              const ws_data = [
+                  ["Nomor BH", "Km HM", "Kelas Jembatan", "Panjang Bentang", "Tahun Pembuatan", "Latitude", "Longtitude"],
+                  ["BH-001", "12+500", "K1", 120, 2010, -7.1907, 112.7847],
+                  ["BH-002", "15+200", "K2", 80, 2015, -3.0167, 104.7333],
+                  ["BH-003", "20+750", "K3", 60, 2020, -3.3167, 114.5833],
+                  ["BH-004", "25+100", "K2", 100, 2018, -0.5000, 117.1500],
+                  ["BH-005", "30+300", "K1", 150, 2012, -2.9833, 104.7500]
+              ];
+              const ws = XLSX.utils.aoa_to_sheet(ws_data);
+              XLSX.utils.book_append_sheet(wb, ws, "Jembatan");
+              XLSX.writeFile(wb, "template-jembatan.xlsx");
+          }
+    </script>
+</body>
+</html> 
